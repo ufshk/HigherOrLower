@@ -1,6 +1,7 @@
+#include <SoftwareSerial.h>;
 int ioPin0 = 12; int ioPin1 = 11; int ioPin2 = 10; int ioPin3 = 9;
 int ioPin4 = 8; int ioPin5 = 7; int ioPin6 = 6; int ioPin7 = 5; // pins for input and output from circuitry
-int writePin = 13; // pin controlling whether circuit memory can be written to
+int writeMemPin = 13; // pin controlling whether circuit memory can be written to
 int higherButtonPin = 3; int lowerButtonPin = 2; // variables that track button interrupts
 int timerDelay = 500; // set constant timer delay
 int score = 5; // score for game
@@ -10,20 +11,20 @@ unsigned long startTime; // start time when button pressed
 unsigned long endTime; // end time when button released
 int wager; // amount player has wagered;
 
-volatile bool displayGameStats = false; // game checks if it should print game stats to display
-volatile bool checkWager1 = false; // game checks if an interrupt for High button has been pressed; Low button cannot trigger code execution in the handler
-volatile bool checkWager2 = false; // same as above, but vice versa for buttons
+int bit0; int bit1; int bit2; int bit3; int bit4; int bit5; int bit6; int bit7;
 
+volatile bool displayGameStats = false; // game checks if it should print game stats to display
 
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(9600); // print to Serial Monitor
+  SoftwareSerial mySerial(0,1);
 
   attachInterrupt(digitalPinToInterrupt(higherButtonPin), button_handler, 
 
   pinMode(ioPin0, OUTPUT); pinMode(ioPin1, OUTPUT); pinMode(ioPin2, OUTPUT); pinMode(ioPin3, OUTPUT);
   pinMode(ioPin4, OUTPUT); pinMode(ioPin5, OUTPUT); pinMode(ioPin6, OUTPUT); pinMode(ioPin7, OUTPUT);
-  pinMode(writePin, OUTPUT);
+  pinMode(writeMemPin, OUTPUT);
   randomSeed(analogRead(0));
   
   gameStartSequence();
@@ -79,6 +80,53 @@ int calculateNextNum() { // calculates next number to appear on screen
   nextNumber = currentNumber + randomNumber;
 }
 
+bool checkWagerCorrect() {
+  if (nextNumber > -1 && wager > -1) {
+    return true;
+  } else if (nextNumber < 0 && wager > -1) {
+    return false;
+  } else if (nextNumber > -1 && wager < 0) {
+    return false;
+  } else if (nextNumber < 0 && wager < 0) {
+    return true;
+  }
+}
+
+void updateScore() {
+  if (checkWagerCorrect()) {
+      for (int i = 0; i < 8; i++) {
+        int inBit = (wager >> i) & 1;
+        switch (i) {
+          case 0:
+            bit0 = inBit;
+            break;
+           case 1:
+            bit1 = inBit;
+            break;
+           case 2:
+            bit2 = inBit;
+            break;
+           case 3:
+            bit3 = inBit;
+            break;
+           case 4:
+            bit4 = inBit;
+            break;
+           case 5:
+            bit5 = inBit;
+            break;
+           case 6:
+            bit6 = inBit;
+            break;
+           case 7:
+            bit7 = inBit;
+            break;
+        }
+  }
+  digitalWrite(ioPin0, bit0); digitalWrite(ioPin0, bit1); digitalWrite(ioPin0, bit2); digitalWrite(ioPin0, bit3); 
+  digitalWrite(ioPin0, bit4); digitalWrite(ioPin0, bit5); digitalWrite(ioPin0, bit6); digitalWrite(ioPin0, bit7); 
+}
+
 void displayGameStatistics() {
   if (!displayGameStats) {
     Serial.print("Score: ");
@@ -92,18 +140,14 @@ void displayGameStatistics() {
 }
 
 void button_handler() {
-  if(digitalRead(higherButtonPin) == HIGH && !checkWager2) {
-    checkWager1 = true;
+  if(digitalRead(higherButtonPin) == HIGH) {
     startTime = millis();
-  } else if(digitalRead(higherButtonPin) == LOW && !checkWager2) {
+  } else if(digitalRead(higherButtonPin) == LOW) {
     endTime = millis();
-    checkWager2 = true;
-  } else if (digitalRead(lowerButtonPin) == HIGH && !checkWager1) {
-    checkWager2 = true;
+  } else if (digitalRead(lowerButtonPin) == HIGH) {
     startTime = millis();
-  } else if (digitalRead(lowerButtonPin) == LOW && !checkWager1) {
+  } else if (digitalRead(lowerButtonPin) == LOW) {
     endTime = millis();
-    checkWager1 = true;
   }
 }
 
@@ -113,4 +157,11 @@ void calculateWager() {
   if (wager > score) {
     wager = score;
   }
+}
+
+void getScore(){
+  mySerial.write(1);
+  delay(2);
+  int inByte = mySerial.read();
+  score = (int) inByte;  
 }
